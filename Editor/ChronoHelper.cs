@@ -95,7 +95,7 @@ public class ChronoHelperEditor : EditorWindow
     private static readonly GUIContent assetStoreMenuItemContent = new GUIContent("AssetStore page");
     private static readonly GUIContent resetButtonContent = new GUIContent(string.Empty, "Reset");
     private static readonly GUIContent pauseButtonContent = new GUIContent(string.Empty, "Pause");
-    private static readonly GUIContent windowTooltipContent = new GUIContent("", "Disabled while in EditorMode");
+    private static readonly GUIContent windowTooltipContent = new GUIContent("", "Inactive while in EditorMode");
     private static readonly GUILayoutOption controlButtonWidth = GUILayout.Width(38.0f);
     private static readonly GUILayoutOption controlButtonHeight = GUILayout.Height(20.0f);
     private static readonly GUILayoutOption chronoSliderMinWidth = GUILayout.MinWidth(256.0f);
