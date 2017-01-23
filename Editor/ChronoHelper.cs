@@ -80,7 +80,7 @@ public class ChronoHelperEditor : EditorWindow
     private const float windowMinWidth = 330.0f;
     private const float windowMaxWidth = 8192.0f;
 
-    private const string githubUrl = "https://github.com/";
+    private const string githubUrl = "https://github.com/dotsquid/ChronoHelper";
     private const string assetStoreUrl = "https://www.assetstore.unity3d.com";
     private const string buttonStyle = "Button";
     private const string resetButtonTitle = "↻";
@@ -246,7 +246,7 @@ public class ChronoHelperEditor : EditorWindow
             {
                 var menu = new GenericMenu();
                 menu.AddItem(githubMenuItemContent, false, ()=>OpenURL(githubUrl));
-                menu.AddItem(assetStoreMenuItemContent, false, () => OpenURL(assetStoreUrl));
+                //menu.AddItem(assetStoreMenuItemContent, false, () => OpenURL(assetStoreUrl));
                 menu.ShowAsContext();
 
                 evt.Use();
