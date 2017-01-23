@@ -83,20 +83,21 @@ public class ChronoHelperEditor : EditorWindow
     private const string githubUrl = "https://github.com/dotsquid/ChronoHelper";
     private const string assetStoreUrl = "https://www.assetstore.unity3d.com";
     private const string buttonStyle = "Button";
-    private const string resetButtonTitle = "↻";
-    private const string pauseButtonTitle = "❚❚";
     private const string oneEighthButtonTitle = "×⅛";
     private const string oneFourthButtonTitle = "×¼";
     private const string halfButtonTitle = "×½";
     private const string oneButtonTitle = "×1";
     private const string oneAndHalfButtonTitle = "×1½";
     private const string twiceButtonTitle = "×2";
+    private const string resetIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAYAAAC5tzfZAAAAXklEQVQoz52RwQ3AMAgDz1GGCfsPk3HcVyTUqmmoXzw4jGzZZikiDGjOyU7tBhypVQEAjTFKAKBGXe6AgOymHZCDUOk/20REvvQa+QqsAaSlI8e+hq9CH1C1pz+R6wKUNx2CpAeEkwAAAABJRU5ErkJggg==";
+    private const string pauseIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAMCAYAAACulacQAAAAKUlEQVQY02PU0ND4zwABjNevX2dgYGBg0NTU/M/AwMDAxIAHjEoSkgQANSEFj9cbB0UAAAAASUVORK5CYII=";
     private static readonly GUIContent githubMenuItemContent = new GUIContent("Github page");
     private static readonly GUIContent assetStoreMenuItemContent = new GUIContent("AssetStore page");
-    private static readonly GUIContent resetButtonContent = new GUIContent(resetButtonTitle, "Reset");
-    private static readonly GUIContent pauseButtonContent = new GUIContent(pauseButtonTitle, "Pause");
+    private static readonly GUIContent resetButtonContent = new GUIContent(string.Empty, "Reset");
+    private static readonly GUIContent pauseButtonContent = new GUIContent(string.Empty, "Pause");
     private static readonly GUIContent windowTooltipContent = new GUIContent("", "Disabled while in EditorMode");
-    private static readonly GUILayoutOption controlButtonWidth = GUILayout.Width(42.0f);
+    private static readonly GUILayoutOption controlButtonWidth = GUILayout.Width(38.0f);
+    private static readonly GUILayoutOption controlButtonHeight = GUILayout.Height(20.0f);
     private static readonly GUILayoutOption chronoSliderMinWidth = GUILayout.MinWidth(256.0f);
     private static readonly GUILayoutOption chronoSliderMaxWidth = GUILayout.MaxWidth(8192.0f);
     private static readonly GUILayoutOption chronoSliderExpandWidth = GUILayout.ExpandWidth(true);
@@ -133,6 +134,8 @@ public class ChronoHelperEditor : EditorWindow
 
     private void OnEnable()
     {
+        resetButtonContent.image = CreateTextureFromBase64(13, 12, resetIconBase64, "reset_icon");
+        pauseButtonContent.image = CreateTextureFromBase64(7, 12, pauseIconBase64, "pause_icon");
     }
 
     private void OnDestroy()
@@ -213,14 +216,14 @@ public class ChronoHelperEditor : EditorWindow
         GUILayout.Space(4.0f);
         GUILayout.FlexibleSpace();
 
-        if (GUILayout.Button(resetButtonContent, controlButtonWidth))
+        if (GUILayout.Button(resetButtonContent, controlButtonWidth, controlButtonHeight))
             ResetTimeScale();
 
         // chrono buttons
         for (int i = 0; i < chronoButtons.Length; ++i)
         {
             var button = chronoButtons[i];
-            button.state = GUILayout.Toggle(button.state, button.content, buttonStyle, controlButtonWidth);
+            button.state = GUILayout.Toggle(button.state, button.content, buttonStyle, controlButtonWidth, controlButtonHeight);
         }
         UpdateChronoButtons();
 
@@ -305,7 +308,6 @@ public class ChronoHelperEditor : EditorWindow
         Application.OpenURL(url);
     }
 
-#if NOPE
     private static Texture2D CreateTextureFromBase64(int width, int height, string base64, string name = "")
     {
         byte[] data = Convert.FromBase64String(base64);
@@ -316,5 +318,4 @@ public class ChronoHelperEditor : EditorWindow
         tex.LoadImage(data);
         return tex;
     }
-#endif
 }
