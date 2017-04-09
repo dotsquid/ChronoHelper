@@ -68,16 +68,17 @@ public class ChronoHelperEditor : EditorWindow
         {
             this.owner = owner;
             this.value = value;
-            editModeContent = new GUIContent(title, kEditModeTooltip);
             playModeContent = new GUIContent(title);
+            editModeContent = new GUIContent(title, kEditModeTooltip);
         }
 
         public ChronoButton(ChronoHelperEditor owner, float value, GUIContent content)
         {
             this.owner = owner;
             this.value = value;
-            editModeContent = new GUIContent(content.text, content.image, kEditModeTooltip);
-            playModeContent = content;
+            playModeContent = new GUIContent(content);
+            editModeContent = new GUIContent(content);
+            editModeContent.tooltip = kEditModeTooltip;
         }
 
         public void Draw()
@@ -99,7 +100,7 @@ public class ChronoHelperEditor : EditorWindow
     private const float kHorizontalLayoutWidth = 600.0f;
     private const float kHorizontalLayoutHeight = 24.0f;
     private const float kVerticalLayoutHeight = 42.0f;
-    private const float kWindowMinWidth = 360.0f;
+    private const float kWindowMinWidth = 342.0f;
     private const float kWindowMaxWidth = 8192.0f;
 
     private const string kGithubUrl = "https://github.com/dotsquid/ChronoHelper";
@@ -118,20 +119,27 @@ public class ChronoHelperEditor : EditorWindow
     //private static readonly GUIContent kAssetStoreMenuItemContent = new GUIContent("AssetStore page");
     private static readonly GUIContent kResetButtonContent = new GUIContent(string.Empty, "Reset");
     private static readonly GUIContent kPauseButtonContent = new GUIContent(string.Empty, "Pause");
+    private static readonly GUIContent kCanResetButtonContent = new GUIContent("R");
+    private static readonly GUIContent kCanSuppressButtonContent = new GUIContent("S");
     private static readonly GUIContent kPlayModeTooltipContent = new GUIContent();
     private static readonly GUIContent kEditModeTooltipContent = new GUIContent("", "Does not affect Time.timeScale while in EditorMode");
-    private static readonly GUIContent kCanResetToggleTooltipContent = new GUIContent("", "Reset chronoScale to value set in EditorMode?");
+    private static readonly GUIContent kCanResetToggleTooltipContent = new GUIContent("", "Auto-reset chronoScale to value set in EditorMode?");
+    private static readonly GUIContent kCanSuppressTimeScaleToggleTooltipContent = new GUIContent("", "Suppress Time.timeScale changes from without?");
     private static readonly GUILayoutOption kControlButtonWidth = GUILayout.Width(38.0f);
     private static readonly GUILayoutOption kControlButtonHeight = GUILayout.Height(20.0f);
-    private static readonly GUILayoutOption kCanResetToggleWidth = GUILayout.Width(14.0f);
-    private static readonly GUILayoutOption kCanResetToggleExpandWidth = GUILayout.ExpandWidth(false);
+    private static readonly GUILayoutOption kControlToggleWidth = GUILayout.Width(20.0f);
+    private static readonly GUILayoutOption kControlToggleExpandWidth = GUILayout.ExpandWidth(false);
     //private static readonly GUILayoutOption kChronoSliderMinWidth = GUILayout.MinWidth(256.0f);
     private static readonly GUILayoutOption kChronoSliderMaxWidth = GUILayout.MaxWidth(8192.0f);
     private static readonly GUILayoutOption kChronoSliderExpandWidth = GUILayout.ExpandWidth(true);
     #endregion
 
+    private static Texture2D resetIconTexture;
+    private static Texture2D pauseIconTexture;
+
     private bool isPlayMode = false;
     private bool canResetOnPlayEnd = true;
+    private bool canSuppressTimeScale = false;
     private float chronoScale = 1.0f;
     private float originalTimeScale = 1.0f;
     private float originalChronoScale = 1.0f;
@@ -149,27 +157,22 @@ public class ChronoHelperEditor : EditorWindow
     {
         EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
         titleContent = new GUIContent("Chrono Helper");
-
-        chronoButtons = new ChronoButton[]{
-            new ChronoButton(this, 0.0f, kPauseButtonContent),
-            new ChronoButton(this, 0.1f, kOneEighthButtonTitle),
-            new ChronoButton(this, 0.25f, kOneFourthButtonTitle),
-            new ChronoButton(this, 0.5f, kHalfButtonTitle),
-            new ChronoButton(this, 1.0f, kOneButtonTitle),
-            new ChronoButton(this, 1.5f, kOneAndHalfButtonTitle),
-            new ChronoButton(this, 2.0f, kTwiceButtonTitle)
-        };
     }
 
     private void OnEnable()
     {
-        kResetButtonContent.image = CreateTextureFromBase64(13, 12, kResetIconBase64, "CH_Icon_Reset");
-        kPauseButtonContent.image = CreateTextureFromBase64(7, 12, kPauseIconBase64, "CH_Icon_Pause");
+        resetIconTexture = CreateTextureFromBase64(13, 12, kResetIconBase64, "CH_Icon_Reset");
+        pauseIconTexture = CreateTextureFromBase64(7, 12, kPauseIconBase64, "CH_Icon_Pause");
+        kResetButtonContent.image = resetIconTexture;
+        kPauseButtonContent.image = pauseIconTexture;
+        CreateChronoButtons();
     }
 
     private void OnDestroy()
     {
         EditorApplication.playmodeStateChanged -= OnApplicationStateChanged;
+        DestroyImmediate(resetIconTexture);
+        DestroyImmediate(pauseIconTexture);
         ResetTimeScale();
     }
 
@@ -185,6 +188,19 @@ public class ChronoHelperEditor : EditorWindow
         DrawContextMenu();
         DrawLayout();
         UpdateTimeScale();
+    }
+
+    private void CreateChronoButtons()
+    {
+        chronoButtons = new ChronoButton[]{
+            new ChronoButton(this, 0.0f, kPauseButtonContent),
+            new ChronoButton(this, 0.1f, kOneEighthButtonTitle),
+            new ChronoButton(this, 0.25f, kOneFourthButtonTitle),
+            new ChronoButton(this, 0.5f, kHalfButtonTitle),
+            new ChronoButton(this, 1.0f, kOneButtonTitle),
+            new ChronoButton(this, 1.5f, kOneAndHalfButtonTitle),
+            new ChronoButton(this, 2.0f, kTwiceButtonTitle)
+        };
     }
 
     private void DrawLayout()
@@ -228,8 +244,8 @@ public class ChronoHelperEditor : EditorWindow
     {
         using (new EditorGUILayout.HorizontalScope())
         {
-            GUILayout.Space(6.0f);
-            GUILayout.FlexibleSpace();
+            //GUILayout.Space(6.0f);
+            //GUILayout.FlexibleSpace();
 
             var oldChronoScale = chronoScale;
             var content = isPlayMode ? kPlayModeTooltipContent : kEditModeTooltipContent;
@@ -239,8 +255,9 @@ public class ChronoHelperEditor : EditorWindow
             {
                 UpdateChronoButtons();
             }
+            DrawControlToggles();
 
-            GUILayout.FlexibleSpace();
+            //GUILayout.FlexibleSpace();
         }
     }
 
@@ -250,8 +267,6 @@ public class ChronoHelperEditor : EditorWindow
         {
             GUILayout.Space(4.0f);
             GUILayout.FlexibleSpace();
-
-            DrawChronoResetToggle();
 
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
@@ -270,10 +285,20 @@ public class ChronoHelperEditor : EditorWindow
         }
     }
 
-    private void DrawChronoResetToggle()
+    private void DrawControlToggles()
     {
-        canResetOnPlayEnd = EditorGUILayout.Toggle(canResetOnPlayEnd, kCanResetToggleWidth);
-        DrawTooltipOverLastRect(kCanResetToggleTooltipContent);
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            //canResetOnPlayEnd = EditorGUILayout.Toggle(kCanResetButtonContent, canResetOnPlayEnd, EditorStyles.miniButton, kControlToggleWidth, kControlToggleExpandWidth);
+            //DrawTooltipOverLastRect(kCanResetToggleTooltipContent);
+            //canCaptureTimeScale = EditorGUILayout.Toggle(kCanCaptureButtonContent, canCaptureTimeScale, EditorStyles.miniButton, kControlToggleWidth, kControlToggleExpandWidth);
+            //DrawTooltipOverLastRect(kCanCaptureTimeScaleToggleTooltipContent);
+
+            canResetOnPlayEnd = GUILayout.Toggle(canResetOnPlayEnd, kCanResetButtonContent, EditorStyles.miniButtonLeft, kControlToggleWidth, kControlToggleExpandWidth);
+            DrawTooltipOverLastRect(kCanResetToggleTooltipContent);
+            canSuppressTimeScale = GUILayout.Toggle(canSuppressTimeScale, kCanSuppressButtonContent, EditorStyles.miniButtonRight, kControlToggleWidth, kControlToggleExpandWidth);
+            DrawTooltipOverLastRect(kCanSuppressTimeScaleToggleTooltipContent);
+        }
     }
 
     private void DrawContextMenu()
@@ -307,8 +332,12 @@ public class ChronoHelperEditor : EditorWindow
 
     private void UpdateChronoScale()
     {
-        if (isPlayMode && EditorApplication.isPlaying)
-                chronoScale = Time.timeScale;
+        if (isPlayMode &&
+            EditorApplication.isPlaying &&
+            !canSuppressTimeScale)
+        {
+            chronoScale = Time.timeScale;
+        }
     }
 
     private void UpdateTimeScale()
