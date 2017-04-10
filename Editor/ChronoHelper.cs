@@ -103,6 +103,13 @@ public class ChronoHelperEditor : EditorWindow
     private const float kWindowMinWidth = 342.0f;
     private const float kWindowMaxWidth = 8192.0f;
 
+    private const string kChronoScalePrefKey = "ChronoHelper.chronoScale";
+    private const string kCanResetChronoScalePrefKey = "ChronoHelper.canResetChronoScale";
+    private const string kCanSuppressTimeScalePrefKey = "ChronoHelper.canSuppressTimeScale";
+    private const float kChronoScalePrefDefault = 1.0f;
+    private const bool kCanResetChronoScalePrefDefault = true;
+    private const bool kCanSuppressTimeScalePrefDefault = false;
+
     private const string kGithubUrl = "https://github.com/dotsquid/ChronoHelper";
     private const string kAssetStoreUrl = "https://www.assetstore.unity3d.com";
     private const string kButtonStyle = "Button";
@@ -166,14 +173,16 @@ public class ChronoHelperEditor : EditorWindow
         kResetButtonContent.image = resetIconTexture;
         kPauseButtonContent.image = pauseIconTexture;
         CreateChronoButtons();
+        LoadPrefs();
     }
 
-    private void OnDestroy()
+    private void OnDisable()
     {
         EditorApplication.playmodeStateChanged -= OnApplicationStateChanged;
         DestroyImmediate(resetIconTexture);
         DestroyImmediate(pauseIconTexture);
         ResetTimeScale();
+        SavePrefs();
     }
 
     private void OnInspectorUpdate()
@@ -382,6 +391,20 @@ public class ChronoHelperEditor : EditorWindow
         {
             ResetTimeScale();
         }
+    }
+
+    private void LoadPrefs()
+    {
+        chronoScale = EditorPrefs.GetFloat(kChronoScalePrefKey, kChronoScalePrefDefault);
+        canResetOnPlayEnd = EditorPrefs.GetBool(kCanResetChronoScalePrefKey, kCanResetChronoScalePrefDefault);
+        canSuppressTimeScale = EditorPrefs.GetBool(kCanSuppressTimeScalePrefKey, kCanSuppressTimeScalePrefDefault);
+    }
+
+    private void SavePrefs()
+    {
+        EditorPrefs.SetFloat(kChronoScalePrefKey, chronoScale);
+        EditorPrefs.SetBool(kCanResetChronoScalePrefKey, canResetOnPlayEnd);
+        EditorPrefs.SetBool(kCanSuppressTimeScalePrefKey, canSuppressTimeScale);
     }
 
     private static void OpenURL(string url)
