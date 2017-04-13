@@ -168,8 +168,8 @@ public class ChronoHelperEditor : EditorWindow
 
     private void OnEnable()
     {
-        resetIconTexture = CreateTextureFromBase64(13, 12, kResetIconBase64, "CH_Icon_Reset");
-        pauseIconTexture = CreateTextureFromBase64(7, 12, kPauseIconBase64, "CH_Icon_Pause");
+        resetIconTexture = CreateTextureFromBase64(kResetIconBase64, "CH_Icon_Reset");
+        pauseIconTexture = CreateTextureFromBase64(kPauseIconBase64, "CH_Icon_Pause");
         kResetButtonContent.image = resetIconTexture;
         kPauseButtonContent.image = pauseIconTexture;
         CreateChronoButtons();
@@ -412,10 +412,10 @@ public class ChronoHelperEditor : EditorWindow
         Application.OpenURL(url);
     }
 
-    private static Texture2D CreateTextureFromBase64(int width, int height, string base64, string name = "")
+    private static Texture2D CreateTextureFromBase64(string base64, string name = "")
     {
         byte[] data = Convert.FromBase64String(base64);
-        var tex = new Texture2D(width, height, TextureFormat.ARGB32, false, true);
+        var tex = new Texture2D(1, 1, TextureFormat.ARGB32, false, true);
         tex.hideFlags = HideFlags.HideAndDontSave;
         tex.name = name;
         tex.filterMode = FilterMode.Bilinear;
