@@ -162,18 +162,19 @@ public class ChronoHelperEditor : EditorWindow
 
     public ChronoHelperEditor()
     {
-        EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
         titleContent = new GUIContent("Chrono Helper");
     }
 
     private void OnEnable()
     {
+        EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
         resetIconTexture = CreateTextureFromBase64(kResetIconBase64, "CH_Icon_Reset");
         pauseIconTexture = CreateTextureFromBase64(kPauseIconBase64, "CH_Icon_Pause");
         kResetButtonContent.image = resetIconTexture;
         kPauseButtonContent.image = pauseIconTexture;
         CreateChronoButtons();
         LoadPrefs();
+        UpdatePlayModeState();
     }
 
     private void OnDisable()
@@ -379,6 +380,11 @@ public class ChronoHelperEditor : EditorWindow
     }
 
     private void OnApplicationStateChanged()
+    {
+        UpdatePlayModeState();
+    }
+
+    private void UpdatePlayModeState()
     {
         var oldPlayMode = isPlayMode;
         isPlayMode = EditorApplication.isPlaying;
