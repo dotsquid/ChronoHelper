@@ -12,6 +12,6 @@ Right after switching to PlayMode ChronoHelper captures the default Time.timeSca
 To change current timeScale use the slider or shortcut buttons.  
 ![ChronoHelper usage](http://i.imgur.com/Ps7QnAz.gif)
 
-> ###Tip
+> ### Tip
 > ChronoHelper's window was designed to occupy as less screen space as possible. The suggested way to place the window is to dock it above or below the GameView window.  
 > ![Dockable window](http://i.imgur.com/MPaNjhf.png)
