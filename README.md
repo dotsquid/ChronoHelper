@@ -14,7 +14,7 @@ To change current timeScale use the slider or shortcut buttons.
 
 > ### Tip
 > ChronoHelper's window was designed to occupy as less screen space as possible. The suggested way to place the window is to dock it above or below the GameView window. In this case the slider and shortcut buttons are arranged in horizontal layout  
-> ![Horizontal layout](https://i.imgur.com/HUtGjPa.gif)
+> ![Horizontal layout](https://i.imgur.com/2hMlKVp.gif)
 >  
 > If the window is not wide enough vertical layout is used  
-> ![Vertical layout](https://i.imgur.com/yW1bvEe.gif)
+> ![Vertical layout](https://i.imgur.com/3ahHR7Z.gif)
