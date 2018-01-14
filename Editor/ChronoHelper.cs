@@ -161,14 +161,18 @@ public class ChronoHelper : EditorWindow
         GetWindow<ChronoHelper>();
     }
 
+    private void Awake()
+    {
+        LoadPrefs();
+        UpdatePlayModeState();
+    }
+
     private void OnEnable()
     {
         EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
         titleContent = new GUIContent("Chrono Helper");
         InitTextureContent();
         CreateChronoButtons();
-        LoadPrefs();
-        UpdatePlayModeState();
     }
 
     private void OnDisable()
@@ -176,8 +180,12 @@ public class ChronoHelper : EditorWindow
         EditorApplication.playmodeStateChanged -= OnApplicationStateChanged;
         DestroyImmediate(resetIconTexture);
         DestroyImmediate(pauseIconTexture);
-        ResetTimeScale();
+    }
+
+    private void OnDestroy()
+    {
         SavePrefs();
+        ResetTimeScale();
     }
 
     private void OnInspectorUpdate()
@@ -206,7 +214,7 @@ public class ChronoHelper : EditorWindow
     {
         chronoButtons = new ChronoButton[]{
             new ChronoButton(this, 0.0f, kPauseButtonContent),
-            new ChronoButton(this, 0.1f, kOneEighthButtonTitle),
+            new ChronoButton(this, 0.125f, kOneEighthButtonTitle),
             new ChronoButton(this, 0.25f, kOneFourthButtonTitle),
             new ChronoButton(this, 0.5f, kHalfButtonTitle),
             new ChronoButton(this, 1.0f, kOneButtonTitle),
