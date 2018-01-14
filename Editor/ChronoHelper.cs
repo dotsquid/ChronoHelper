@@ -122,6 +122,7 @@ public class ChronoHelper : EditorWindow
     private const string kEditModeTooltip = "Does not affect Time.timeScale while in EditorMode";
     private const string kResetIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAYAAAC5tzfZAAAAXklEQVQoz52RwQ3AMAgDz1GGCfsPk3HcVyTUqmmoXzw4jGzZZikiDGjOyU7tBhypVQEAjTFKAKBGXe6AgOymHZCDUOk/20REvvQa+QqsAaSlI8e+hq9CH1C1pz+R6wKUNx2CpAeEkwAAAABJRU5ErkJggg==";
     private const string kPauseIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAMCAYAAACulacQAAAAKUlEQVQY02PU0ND4zwABjNevX2dgYGBg0NTU/M/AwMDAxIAHjEoSkgQANSEFj9cbB0UAAAAASUVORK5CYII=";
+
     private static readonly GUIContent kGithubMenuItemContent = new GUIContent("Github page");
     //private static readonly GUIContent kAssetStoreMenuItemContent = new GUIContent("AssetStore page");
     private static readonly GUIContent kResetButtonContent = new GUIContent(string.Empty, "Reset");
@@ -157,21 +158,14 @@ public class ChronoHelper : EditorWindow
     [MenuItem("Window/Chrono Helper")]
     private static void ShowWindow()
     {
-        GetWindow<ChronoHelperEditor>();
-    }
-
-    public ChronoHelperEditor()
-    {
-        titleContent = new GUIContent("Chrono Helper");
+        GetWindow<ChronoHelper>();
     }
 
     private void OnEnable()
     {
         EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
-        resetIconTexture = CreateTextureFromBase64(kResetIconBase64, "CH_Icon_Reset");
-        pauseIconTexture = CreateTextureFromBase64(kPauseIconBase64, "CH_Icon_Pause");
-        kResetButtonContent.image = resetIconTexture;
-        kPauseButtonContent.image = pauseIconTexture;
+        titleContent = new GUIContent("Chrono Helper");
+        InitTextureContent();
         CreateChronoButtons();
         LoadPrefs();
         UpdatePlayModeState();
@@ -198,6 +192,14 @@ public class ChronoHelper : EditorWindow
         DrawContextMenu();
         DrawLayout();
         UpdateTimeScale();
+    }
+
+    private void InitTextureContent()
+    {
+        resetIconTexture = CreateTextureFromBase64(kResetIconBase64, "CH_Icon_Reset");
+        pauseIconTexture = CreateTextureFromBase64(kPauseIconBase64, "CH_Icon_Pause");
+        kResetButtonContent.image = resetIconTexture;
+        kPauseButtonContent.image = pauseIconTexture;
     }
 
     private void CreateChronoButtons()
