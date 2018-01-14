@@ -23,7 +23,7 @@ using System;
 using UnityEditor;
 using UnityEngine;
 
-public class ChronoHelperEditor : EditorWindow
+public class ChronoHelper : EditorWindow
 {
     private class ChronoButton
     {
@@ -60,11 +60,11 @@ public class ChronoHelperEditor : EditorWindow
             }
         }
 
-        private ChronoHelperEditor owner;
+        private ChronoHelper owner;
         private bool currentState = false;
         private bool oldState = false;
 
-        public ChronoButton(ChronoHelperEditor owner, float value, string title, string tooltip = "")
+        public ChronoButton(ChronoHelper owner, float value, string title, string tooltip = "")
         {
             this.owner = owner;
             this.value = value;
@@ -72,7 +72,7 @@ public class ChronoHelperEditor : EditorWindow
             editModeContent = new GUIContent(title, kEditModeTooltip);
         }
 
-        public ChronoButton(ChronoHelperEditor owner, float value, GUIContent content)
+        public ChronoButton(ChronoHelper owner, float value, GUIContent content)
         {
             this.owner = owner;
             this.value = value;
