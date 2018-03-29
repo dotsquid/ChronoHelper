@@ -1,6 +1,22 @@
 ChangeLog
 =========
 
+v 1.31 (2018-01-14)
+------------------
+#### Implemented enhancements:
+* Improved UI; add support of Dark/Pro skin (not yet tested/confirmed).
+
+v 1.3 (2018-01-14)
+------------------
+#### Fixed bugs:
+* Missing window in the layout after Editor restart.
+* Storing / restoring / applying chronoScale when opening / closing window and switching between play / edit mode.
+
+v 1.21 (2017-08-06)
+------------------
+#### Fixed bugs:
+* Doing nothing if opened in PlayMode.
+
 v 1.2 (2017-04-10)
 ------------------
 #### Implemented enhancements:
