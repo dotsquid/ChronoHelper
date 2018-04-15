@@ -194,7 +194,7 @@ public class ChronoHelper : EditorWindow
     private ChronoButton[] _chronoButtons;
     private ChronoButton _currentChronoButton = null;
 
-    [MenuItem("Window/Chrono Helper")]
+    [MenuItem("Tools/ChronoHelper")]
     private static void ShowWindow()
     {
         GetWindow<ChronoHelper>();
