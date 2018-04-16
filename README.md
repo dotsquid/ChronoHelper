@@ -14,7 +14,8 @@ While being in EditorMode, ChronoHelper is inactive. That is done to protect the
 Right after switching to PlayMode ChronoHelper captures the default value of Time.timeScale in order to restore this value on switching back to EditorMode (if ‘Auto-reset’ is on).  
 ![Auto-reset](https://i.imgur.com/mldW9zE.gif)  
 Use ‘Lock’ if you want to suppress any changes of Time.timeScale from without (like other scripts or TimeManager Inspector). Be aware that this mode can break the normal flow of your game (e.g. the game won’t actually pause in main menu).  
-![Lock](https://i.imgur.com/yxOQVTF.gif)  
+![Lock Off](https://i.imgur.com/rfJnloe.gif)  
+![Lock On](https://i.imgur.com/xFNxR7f.gif) 
 
 > ### Tip
 > ChronoHelper's window was designed to occupy as less screen space as possible. The suggested way to place the window is to dock it above or below the GameView window. In this case the slider and shortcut buttons are arranged in horizontal layout  
