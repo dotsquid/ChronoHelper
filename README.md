@@ -1,6 +1,7 @@
 # ChronoHelper
 ChronoHelper is a free open-source tool for Unity Editor for controlling TimeScale in PlayMode with ease.
-It becomes very handy when it’s required to examine a suspicious moment of gameplay in slow-motion or conversely when it’s preferable to skip uninteresting part in fast-forward.
+It becomes very handy when it’s required to examine a suspicious moment of gameplay in slow-motion or conversely when it’s preferable to skip uninteresting part in fast-forward.  
+[![Say Thanks!](https://img.shields.io/badge/Say%20Thanks-!-1EAEDB.svg)](https://saythanks.io/to/dotsquid)
 
 ## Installation
 Just drop *'ChronoHelper'* folder to your project's *'Asset'* folder.  
