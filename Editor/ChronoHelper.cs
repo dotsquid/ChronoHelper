@@ -1,514 +1,879 @@
-﻿/*
-    Copyright (c) 2016 - 2018 Kyrylo Yakovliev
-    https://twitter.com/dotsquid
-    
-    This software is provided 'as-is', without any express or implied
-    warranty. In no event will the authors be held liable for any damages
-    arising from the use of this software.
-    
-    Permission is granted to anyone to use this software for any purpose,
-    including commercial applications, and to alter it and redistribute it
-    freely, subject to the following restrictions:
-    
-    1. The origin of this software must not be misrepresented; you must not
-       claim that you wrote the original software. If you use this software
-       in a product, an acknowledgement in the product documentation would be
-       appreciated but is not required.
-    2. Altered source versions must be plainly marked as such, and must not be
-       misrepresented as being the original software.
-    3. This notice may not be removed or altered from any source distribution.
- */
-
-using System;
+﻿using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using dotsquid.ChronoHelper.Internal;
 
-public class ChronoHelper : EditorWindow
+namespace dotsquid.ChronoHelper
 {
-    private class ChronoButton
+    internal class ChronoHelper : EditorWindow, IHasCustomMenu
     {
-        private ChronoHelper _owner;
-        private GUIContent _editModeContent;
-        private GUIContent _playModeContent;
-        private GUIContent _editModePressedContent;
-        private GUIContent _playModePressedContent;
-        private float _value;
-        private bool _currentState = false;
-        private bool _oldState = false;
+        private static readonly Vector2 kBorderPositionOffset = Vector2.one;
+        private static readonly Vector2 kBorderSizeOffset = kBorderPositionOffset * 2.0f;
 
-        public bool state
+        private class ChronoBack : IDisposable
         {
-            get { return _currentState; }
+            private const float kTau = Mathf.PI * 2.0f;
 
-            set
+            public enum Mode
             {
-                _currentState = value;
-                if (!_currentState && _owner._currentChronoButton == this)
-                    _owner._currentChronoButton = null;
-                if (!_oldState && _currentState) // button was pressed in
+                Normal,
+                Warning,
+            }
+
+            private ChronoHelper _owner;
+            private Mode _mode;
+            private double _modeSetTime;
+            private float _blinkPhase;
+
+            public Mode mode
+            {
+                get => _mode;
+                set
                 {
-                    if (null != _owner._currentChronoButton)
-                        _owner._currentChronoButton.state = false;
-                    _owner._currentChronoButton = this;
-                    _owner._chronoScale = Mathf.Clamp(this._value, kChronoMinScale, kChronoMaxScale);
+                    if (value != _mode)
+                    {
+                        _mode = value;
+                        _modeSetTime = EditorApplication.timeSinceStartup;
+                    }
                 }
-                _oldState = _currentState;
+            }
+
+            private Color color
+            {
+                get
+                {
+                    var setting = Settings.I;
+                    var normalColor = setting.normalBackColor;
+                    switch (_mode)
+                    {
+                        case Mode.Warning:
+                            var warningColor = setting.warningBackColor;
+                            return Color.Lerp(normalColor, warningColor, _blinkPhase);
+
+                        case Mode.Normal:
+                        default:
+                            return normalColor;
+                    }
+                }
+            }
+
+            private TextureStorage textureStorage => _owner._textureStorage;
+
+            public ChronoBack(ChronoHelper owner)
+            {
+                _owner = owner;
+                EditorApplication.update += Update;
+            }
+
+            public void Dispose()
+            {
+                EditorApplication.update -= Update;
+            }
+
+            public void Draw(Rect windowRect)
+            {
+                using (GUIHelper.ReplaceColor.With(color))
+                {
+                    var backTexture = textureStorage.backTexture;
+                    var backRect = windowRect;
+                    backRect.position = kBorderPositionOffset;
+                    backRect.size -= kBorderSizeOffset;
+                    var uvRect = default(Rect);
+                    uvRect.width = backRect.width / backTexture.width;
+                    uvRect.height = backRect.height / backTexture.height;
+                    GUI.DrawTextureWithTexCoords(backRect, backTexture, uvRect);
+                }
+            }
+
+            private void Update()
+            {
+                if (_mode == Mode.Warning)
+                {
+                    var setting = Settings.I;
+                    var time = EditorApplication.timeSinceStartup;
+                    var warningPeriod = setting.warningBlinkPeriod;
+                    var warningDuration = setting.warningBlinkDuration;
+                    var endTime = _modeSetTime + warningDuration;
+                    if (time > endTime)
+                    {
+                        mode = Mode.Normal;
+                    }
+                    else
+                    {
+                        var phase = (endTime - EditorApplication.timeSinceStartup) / warningPeriod;
+                        _blinkPhase = (warningDuration > 0.0f)
+                                    ? 0.5f - (float)Math.Sin(phase * kTau) * 0.5f
+                                    : 1.0f;
+                    }
+                }
             }
         }
 
-        private GUIContent normalContent
+        private class ChronoButton
+        {
+            private ChronoHelper _owner;
+            private GUIContent _editModeContent;
+            private GUIContent _playModeContent;
+            private GUIContent _editModePressedContent;
+            private GUIContent _playModePressedContent;
+            private float _value;
+            private bool _currentState = false;
+            private bool _oldState = false;
+
+            public bool state
+            {
+                get => _currentState;
+                set
+                {
+                    _currentState = value;
+                    if (!_currentState && _owner._currentChronoButton == this)
+                        _owner._currentChronoButton = null;
+                    if (!_oldState && _currentState) // button was pressed in
+                    {
+                        if (null != _owner._currentChronoButton)
+                            _owner._currentChronoButton.state = false;
+                        _owner._currentChronoButton = this;
+                        data.chronoScale = Mathf.Clamp(_value, kChronoMinScale, kChronoMaxScale);
+                    }
+                    _oldState = _currentState;
+                }
+            }
+
+            public float value => _value;
+
+            private Data data => _owner._data;
+            private GUIContent normalContent => _owner._isPlayMode ? _playModeContent : _editModeContent;
+            private GUIContent pressedContent => _owner._isPlayMode ? _playModePressedContent : _editModePressedContent;
+            private GUIContent content => state ? pressedContent : normalContent;
+
+            public ChronoButton(ChronoHelper owner, float value, GUIContent normalContent, GUIContent pressedContent = null)
+            {
+                _owner = owner;
+                _value = value;
+                _playModeContent = new GUIContent(normalContent);
+                _editModeContent = new GUIContent(normalContent);
+                if (null == pressedContent)
+                {
+                    _playModePressedContent = new GUIContent(normalContent);
+                    _editModePressedContent = new GUIContent(normalContent);
+                }
+                else
+                {
+                    _playModePressedContent = new GUIContent(pressedContent);
+                    _editModePressedContent = new GUIContent(pressedContent);
+                }
+                _editModeContent.tooltip = kEditModeTooltip;
+            }
+
+            public void Update()
+            {
+                state = (Mathf.Abs(data.chronoScale - _value) <= Mathf.Min(_value * 0.05f, 0.05f));
+                if (state)
+                    data.chronoScale = _value;
+            }
+
+            public void Draw(string style = null)
+            {
+                if (string.IsNullOrEmpty(style))
+                    style = kButtonStyle;
+                state = GUILayout.Toggle(state, content, style, _owner._controlButtonWidth, kChronoButtonHeight);
+            }
+        }
+
+        [Serializable]
+        private class Data
+        {
+            private const string kPrefKey = Consts.kNamePrefix + "data";
+
+            public float chronoScale = 1.0f;
+            public bool canResetOnPlayEnd = true;
+            public bool canSuppressTimeScale = false;
+
+            public void Save()
+            {
+                var json = JsonUtility.ToJson(this);
+                EditorPrefs.SetString(kPrefKey, json);
+            }
+
+            public void Load()
+            {
+                if (EditorPrefs.HasKey(kPrefKey))
+                {
+                    var json = EditorPrefs.GetString(kPrefKey);
+                    JsonUtility.FromJsonOverwrite(json, this);
+                }
+            }
+        }
+
+        private class TextureStorage
+        {
+            public Texture2D backTexture;
+            public Texture2D settingsIconDarkTexture;
+            public Texture2D settingsIconLightTexture;
+            public Texture2D resetIconDarkTexture;
+            public Texture2D resetIconLightTexture;
+            public Texture2D pauseIconDarkTexture;
+            public Texture2D pauseIconLightTexture;
+            public Texture2D lockedIconLightTexture;
+            public Texture2D unlockedIconDarkTexture;
+            public Texture2D unlockedIconLightTexture;
+            public Texture2D autoResetOnIconLightTexture;
+            public Texture2D autoResetOffIconDarkTexture;
+            public Texture2D autoResetOffIconLightTexture;
+
+            private List<Texture2D> _all = new List<Texture2D>();
+
+            public void Load()
+            {
+                Load(out backTexture, Base64Image.Texture.Back, "CH_Texture_Back_Stripes");
+                Load(out settingsIconDarkTexture, Base64Image.Icon.Settings_dark, "CH_Icon_Settings_Dark");
+                Load(out settingsIconLightTexture, Base64Image.Icon.Settings_light, "CH_Icon_Settings_Light");
+                Load(out resetIconDarkTexture, Base64Image.Icon.Reset_dark, "CH_Icon_Reset_Dark");
+                Load(out resetIconLightTexture, Base64Image.Icon.Reset_light, "CH_Icon_Reset_Light");
+                Load(out pauseIconDarkTexture, Base64Image.Icon.Pause_dark, "CH_Icon_Pause_Dark");
+                Load(out pauseIconLightTexture, Base64Image.Icon.Pause_light, "CH_Icon_Pause_Light");
+                Load(out lockedIconLightTexture, Base64Image.Icon.Locked_light, "CH_Icon_Locked_Light");
+                Load(out unlockedIconDarkTexture, Base64Image.Icon.Unlocked_dark, "CH_Icon_Unlocked_Dark");
+                Load(out unlockedIconLightTexture, Base64Image.Icon.Unlocked_light, "CH_Icon_Unlocked_Light");
+                Load(out autoResetOnIconLightTexture, Base64Image.Icon.AutoResetOn_light, "CH_Icon_AutoResetOn_Light");
+                Load(out autoResetOffIconDarkTexture, Base64Image.Icon.AutoResetOff_dark, "CH_Icon_AutoResetOff_Dark");
+                Load(out autoResetOffIconLightTexture, Base64Image.Icon.AutoResetOff_light, "CH_Icon_AutoResetOff_Light");
+            }
+
+            public void Clear()
+            {
+                foreach (var texture in _all)
+                {
+                    DestroyImmediate(texture);
+                }
+                _all.Clear();
+            }
+
+            private void Load(out Texture2D texture, string base64, string name)
+            {
+                texture = Helper.CreateTextureFromBase64(base64, name);
+                _all.Add(texture);
+            }
+        }
+
+        #region Constants
+        private const float kChronoMinScale = 0.0f;
+        private const float kChronoMaxScale = 100.0f;
+        private const float kChronoButtonDefaultWidth = 38.0f;
+        private const float kHorizontalLayoutThresholdFactor = 1.2f;
+        private const float kHorizontalLayoutThresholdExtra = 128.0f;
+        private const float kHorizontalLayoutHeight = 24.0f;
+        private const float kVerticalLayoutUndockedHeight = 40.0f;
+        private const float kVerticalLayoutDockedHeight = 44.0f;
+        private const float kWindowMinWidth = 156.0f;
+        private const float kWindowMaxWidth = 8192.0f;
+
+        private const string kButtonStyle = "Button";
+        private const string kButtonMidStyle = "ButtonMid";
+        private const string kButtonLeftStyle = "ButtonLeft";
+        private const string kButtonRightStyle = "ButtonRight";
+        private const string kEditModeTooltip = "Does not affect Time.timeScale while in EditorMode";
+        private const string kMenuPath = "Window/ChronoHelper";
+
+        private static readonly GUIContent kSettingsMenuItemContent = new GUIContent("Settings");
+        private static readonly GUIContent kGitHubMenuItemContent = new GUIContent("GitHub");
+        private static readonly GUIContent kHomepageMenuItemContent = new GUIContent("Home page");
+        private static readonly GUIContent kDotsquidDotComMenuItemContent = new GUIContent("dotsquid.com");
+        private static readonly GUIContent kResetButtonContent = new GUIContent(string.Empty, "Reset");
+        private static readonly GUIContent kPauseButtonNormalContent = new GUIContent(string.Empty, "Pause");
+        private static readonly GUIContent kPauseButtonPressedContent = new GUIContent(string.Empty, "Pause");
+        private static readonly GUIContent kSettingsButtonContent = new GUIContent(string.Empty, "Settings");
+        private static readonly GUIContent kLockedButtonContent = new GUIContent(string.Empty, "Suppress Time.timeScale changes from without");
+        private static readonly GUIContent kUnlockedButtonContent = new GUIContent(string.Empty, "Allow Time.timeScale changes from without");
+        private static readonly GUIContent kAutoResetOnButtonContent = new GUIContent(string.Empty, "Auto-reset chronoScale to value set in EditorMode");
+        private static readonly GUIContent kAutoResetOffButtonContent = new GUIContent(string.Empty, "Don't auto-reset chronoScale to value set in EditorMode");
+        private static readonly GUIContent kPlayModeTooltipContent = new GUIContent();
+        private static readonly GUIContent kEditModeTooltipContent = new GUIContent("", "Does not affect Time.timeScale while in EditorMode");
+        private static readonly GUILayoutOption kChronoButtonHeight = GUILayout.Height(20.0f);
+        private static readonly GUILayoutOption kControlToggleWidth = GUILayout.Width(24.0f);
+        private static readonly GUILayoutOption kControlToggleHeight = GUILayout.Height(16.0f);
+        private static readonly GUILayoutOption kControlToggleExpandWidth = GUILayout.ExpandWidth(false);
+        private static readonly GUILayoutOption kChronoSliderValueWidth = GUILayout.Width(40.0f);
+        private static readonly GUILayoutOption kChronoSliderMaxWidth = GUILayout.MaxWidth(8192.0f);
+        private static readonly GUILayoutOption kChronoSliderExpandWidth = GUILayout.ExpandWidth(true);
+        private static readonly GUILayoutOption[] kControlToggleOptions = new GUILayoutOption[] { kControlToggleWidth, kControlToggleHeight, kControlToggleExpandWidth };
+        #endregion
+
+        private Data _data = new Data();
+        private TextureStorage _textureStorage = new TextureStorage();
+        private SettingsWindow _settingsWindow;
+        private bool _isPlayMode = false;
+        private bool _areChronoButtonDirty = true;
+        private float _originalTimeScale = 1.0f;
+        private float _originalChronoScale = 1.0f;
+        private float _chronoButtonWidth = kChronoButtonDefaultWidth;
+        private float _chronoButtonsTotalWidth = 0.0f;
+        private Layout _currentLayout;
+        private Rect _windowRect;
+        private ChronoBack _chronoBack;
+        private ChronoButton[] _chronoButtons;
+        private ChronoButton _currentChronoButton = null;
+        private GUILayoutOption _controlButtonWidth = GUILayout.Width(kChronoButtonDefaultWidth);
+
+        private float maxChronoValue
         {
             get
             {
-                return _owner._isPlayMode ? _playModeContent : _editModeContent;
+                float result = 1.0f;
+                if (null != _chronoButtons)
+                {
+                    var count = _chronoButtons.Length;
+                    if (count > 0)
+                    {
+                        result = _chronoButtons[count - 1].value;
+                    }
+                }
+                return result;
             }
         }
 
-        private GUIContent pressedContent
+        [MenuItem(kMenuPath, false, 25000)]
+        private static void ShowWindow()
         {
-            get
-            {
-                return _owner._isPlayMode ? _playModePressedContent : _editModePressedContent;
-            }
+            GetWindow<ChronoHelper>();
         }
 
-        private GUIContent content
+        private void Awake()
         {
-            get
-            {
-                return state ? pressedContent : normalContent;
-            }
+            _data.Load();
+            UpdatePlayModeState();
         }
 
-        public ChronoButton(ChronoHelper owner, float value, GUIContent normalContent, GUIContent pressedContent = null)
+        private void OnEnable()
         {
-            _owner = owner;
-            _value = value;
-            _playModeContent = new GUIContent(normalContent);
-            _editModeContent = new GUIContent(normalContent);
-            if (null == pressedContent)
+            titleContent = new GUIContent("ChronoHelper");
+            _textureStorage.Load();
+            UpdateButtonsContent();
+            InitChronoBack();
+            ScheduleChronoButtonsRecreation();
+            Subscribe();
+        }
+
+        private void OnDisable()
+        {
+            _chronoBack.Dispose();
+            _textureStorage.Clear();
+            CloseSettingsWindow();
+            Unsubscribe();
+        }
+
+        private void OnDestroy()
+        {
+            _data.Save();
+            ResetTimeScale();
+        }
+
+        private void OnInspectorUpdate()
+        {
+            Repaint();
+        }
+
+        private void OnGUI()
+        {
+            RecreateChronoButtonsIfRequired();
+            CheckChronoScaleIntegrity();
+            UpdateChronoScale();
+            UpdateWindowRect();
+            DrawBackground();
+            DrawContextMenu();
+            DrawLayout();
+            UpdateTimeScale();
+        }
+
+        private void InitChronoBack()
+        {
+            _chronoBack = new ChronoBack(this);
+        }
+
+        private void UpdateButtonsContent()
+        {
+            if (EditorGUIUtility.isProSkin)
             {
-                _playModePressedContent = new GUIContent(normalContent);
-                _editModePressedContent = new GUIContent(normalContent);
+                kSettingsButtonContent.image = _textureStorage.settingsIconLightTexture;
+                kResetButtonContent.image = _textureStorage.resetIconLightTexture;
+                kPauseButtonNormalContent.image = _textureStorage.pauseIconLightTexture;
+                kPauseButtonPressedContent.image = _textureStorage.pauseIconLightTexture;
+                kLockedButtonContent.image = _textureStorage.lockedIconLightTexture;
+                kUnlockedButtonContent.image = _textureStorage.unlockedIconLightTexture;
+                kAutoResetOnButtonContent.image = _textureStorage.autoResetOnIconLightTexture;
+                kAutoResetOffButtonContent.image = _textureStorage.autoResetOffIconLightTexture;
             }
             else
             {
-                _playModePressedContent = new GUIContent(pressedContent);
-                _editModePressedContent = new GUIContent(pressedContent);
+                kSettingsButtonContent.image = _textureStorage.settingsIconDarkTexture;
+                kResetButtonContent.image = _textureStorage.resetIconDarkTexture;
+                kPauseButtonNormalContent.image = _textureStorage.pauseIconDarkTexture;
+                kPauseButtonPressedContent.image = _textureStorage.pauseIconLightTexture;
+                kLockedButtonContent.image = _textureStorage.lockedIconLightTexture;
+                kUnlockedButtonContent.image = _textureStorage.unlockedIconDarkTexture;
+                kAutoResetOnButtonContent.image = _textureStorage.autoResetOnIconLightTexture;
+                kAutoResetOffButtonContent.image = _textureStorage.autoResetOffIconDarkTexture;
             }
-            _editModeContent.tooltip = kEditModeTooltip;
         }
 
-        public void Draw()
+        private void ResetChronoButtonWidth()
         {
-            state = GUILayout.Toggle(state, content, kButtonStyle, kControlButtonWidth, kControlButtonHeight);
+            _chronoButtonWidth = kChronoButtonDefaultWidth;
         }
 
-        public void Update()
+        private void UpdateChronoButtonWidth(GUIContent buttonContent)
         {
-            state = (Mathf.Abs(_owner._chronoScale - _value) <= Mathf.Min(_value * 0.05f, 0.05f));
-            if (state)
-                _owner._chronoScale = _value;
+            GUIStyle buttonStyle = kButtonStyle;
+            buttonStyle.CalcMinMaxWidth(buttonContent, out var minWidth, out var maxWidth);
+            _chronoButtonWidth = Mathf.Max(_chronoButtonWidth, maxWidth);
         }
-    }
 
-    #region Constants
-    private const float kChronoMinScale = 0.0f;
-    private const float kChronoMaxScale = 2.0f;
-    private const float kHorizontalLayoutWidth = 600.0f;
-    private const float kHorizontalLayoutHeight = 24.0f;
-    private const float kVerticalLayoutHeight = 42.0f;
-    private const float kWindowMinWidth = 342.0f;
-    private const float kWindowMaxWidth = 8192.0f;
-
-    private const string kChronoScalePrefKey = "ChronoHelper.chronoScale";
-    private const string kCanResetChronoScalePrefKey = "ChronoHelper.canResetChronoScale";
-    private const string kCanSuppressTimeScalePrefKey = "ChronoHelper.canSuppressTimeScale";
-    private const float kChronoScalePrefDefault = 1.0f;
-    private const bool kCanResetChronoScalePrefDefault = true;
-    private const bool kCanSuppressTimeScalePrefDefault = false;
-
-    private const string kGithubUrl = "https://github.com/dotsquid/ChronoHelper";
-    private const string kAssetStoreUrl = "https://www.assetstore.unity3d.com";
-    private const string kButtonStyle = "Button";
-    private const string kOneEighthButtonTitle = "×⅛";
-    private const string kOneFourthButtonTitle = "×¼";
-    private const string kHalfButtonTitle = "×½";
-    private const string kOneButtonTitle = "×1";
-    private const string kOneAndHalfButtonTitle = "×1½";
-    private const string kTwiceButtonTitle = "×2";
-    private const string kEditModeTooltip = "Does not affect Time.timeScale while in EditorMode";
-
-    public const string kResetIcon_dark = "iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAYAAAC5tzfZAAAAXklEQVQoz52RwQ3AMAgDz1GGCfsPk3HcVyTUqmmoXzw4jGzZZikiDGjOyU7tBhypVQEAjTFKAKBGXe6AgOymHZCDUOk/20REvvQa+QqsAaSlI8e+hq9CH1C1pz+R6wKUNx2CpAeEkwAAAABJRU5ErkJggg==";
-    public const string kResetIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAA0AAAAMCAYAAAC5tzfZAAAAXklEQVQoz52RwQ3AMAgDz1G2yf6bhHncVyTUqmmoXzw4jGzZZikiDGiMwU7tBhypVQEAzTlLAKBGXe6AgOymHZCDUOk/20REvvQa+QqsAaSlI8e+hq9CH1C1pz+R6wLdSyOOjGmt7wAAAABJRU5ErkJggg==";
-    public const string kPauseIcon_dark = "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAMCAYAAACulacQAAAAKUlEQVQY02PU0ND4zwABjNevX2dgYGBg0NTU/M/AwMDAxIAHjEoSkgQANSEFj9cbB0UAAAAASUVORK5CYII=";
-    public const string kPauseIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAMCAYAAACulacQAAAAKUlEQVQY02O8cuXKfwYIYNTW1mZgYGBguHr16n8GBgYGJgY8YFSSkCQA3ocHkwSoErMAAAAASUVORK5CYII=";
-    public const string kLockedIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAbklEQVQoz52Q0Q2AMAhE70yHgdl0HDsb3QZ/rGkJjdH7g0LvHXR3fFGJjdZa/IEAICLzAkmYmavqMU7fPXaSkrjWUJ9jseGjHquEfZKI8JdDuqCqRwz/lqEm4ZdXgpn5K9IKIb49VyIJAPsKsc9d5Pwp8+BxwkcAAAAASUVORK5CYII=";
-    public const string kUnlockedIcon_dark = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAa0lEQVQoz5VRQQ7AIAgT46fkS/odv9RvdYc5o7hM1oRLFdqCkAx/kCyhqssEAKKqAcBNkByVcybJMlfnxp/0otqMwvIYHbaXAfKEtt4tAIhX4WwJQAVQ3Q3dd3Pd4ZQnzjY+AtdtSx3ltNoLI+dJPoQHb3kAAAAASUVORK5CYII=";
-    public const string kUnlockedIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAcUlEQVQoz5WRyw3AIAxD44ph7NnadTob2YZeCoKoCJpbvn5JUEqxP5ZiwN2HCSTh7kZybABgOeci6eob3hgqSfpQvXtH0pA8NrCHAU0qskcjiV2FNZKkKy6/2uGO7NM/1FMukWYIMdeuBMDM7Jwh1roHbuItb9B5vFoAAAAASUVORK5CYII=";
-    public const string kAutoResetOnIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAg0lEQVQoz5WQMQ7DMAwDqaJ6iCc9LnlO/ThNfggHZkgcxGkLxDcJMCnKNEmY4YVJ3gDQWgMAkJS7G0m4+yAspYwJJPU44SruM8lT5O42GCJizcxPn+9bM1MAdtOlpeV4wC+DJEjaEw5qREzXWh99+nbrFxGx9tNNEszOEpY/i+tgmGEDIxNHz8eqd30AAAAASUVORK5CYII=";
-    public const string kAutoResetOffIcon_dark = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAdElEQVQoz5WQ0Q2DMAwFXxBL2SuFcehKXuv4AWRM2oKlSHZyL4muAXpTk17WJeDuw+fy/vQEjojlmBswhCOiJfhzHgACuplhZgD9mPdeey/gDChByvCvgOrNfwMjuAbmasPdV0lrEXC3lGz0gd27pfqNb2sD55vTX0C1gsEAAAAASUVORK5CYII=";
-    public const string kAutoResetOffIcon_light = "iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAAfElEQVQoz5VRwQ3EIAwzpy7j2WCcdjazje9DEOWiq5pXsOw4McU23tQHL+sm6L2ndjc8VpJkST+CgVXbsI1iO51MskgyyQbgmreOpi4ONd6jhySHA5aUgoSV/E+AffKjICPvgmMFSTZJJ4BzC6DF4JlSpJE5pCk9/XCs9AXp0pyoA0mhyQAAAABJRU5ErkJggg==";
-
-    private static readonly GUIContent kGithubMenuItemContent = new GUIContent("Github page");
-    //private static readonly GUIContent kAssetStoreMenuItemContent = new GUIContent("AssetStore page");
-    private static readonly GUIContent kResetButtonContent = new GUIContent(string.Empty, "Reset");
-    private static readonly GUIContent kPlayModeTooltipContent = new GUIContent();
-    private static readonly GUIContent kEditModeTooltipContent = new GUIContent("", "Does not affect Time.timeScale while in EditorMode");
-
-    private static readonly GUIContent kPauseButtonNormalContent = new GUIContent(string.Empty, "Pause");
-    private static readonly GUIContent kPauseButtonPressedContent = new GUIContent(string.Empty, "Pause");
-    private static readonly GUIContent kLockedButtonContent = new GUIContent(string.Empty, "Suppress Time.timeScale changes from without");
-    private static readonly GUIContent kUnlockedButtonContent = new GUIContent(string.Empty, "Allow Time.timeScale changes from without");
-    private static readonly GUIContent kAutoResetOnButtonContent = new GUIContent(string.Empty, "Auto-reset chronoScale to value set in EditorMode");
-    private static readonly GUIContent kAutoResetOffButtonContent = new GUIContent(string.Empty, "Don't auto-reset chronoScale to value set in EditorMode");
-
-    private static readonly GUILayoutOption kControlButtonWidth = GUILayout.Width(38.0f);
-    private static readonly GUILayoutOption kControlButtonHeight = GUILayout.Height(20.0f);
-    private static readonly GUILayoutOption kControlToggleWidth = GUILayout.Width(24.0f);
-    private static readonly GUILayoutOption kControlToggleHeight = GUILayout.Height(16.0f);
-    private static readonly GUILayoutOption kControlToggleExpandWidth = GUILayout.ExpandWidth(false);
-    //private static readonly GUILayoutOption kChronoSliderMinWidth = GUILayout.MinWidth(256.0f);
-    private static readonly GUILayoutOption kChronoSliderMaxWidth = GUILayout.MaxWidth(8192.0f);
-    private static readonly GUILayoutOption kChronoSliderExpandWidth = GUILayout.ExpandWidth(true);
-    #endregion
-
-    private static Texture2D _resetIconDarkTexture;
-    private static Texture2D _resetIconLightTexture;
-    private static Texture2D _pauseIconDarkTexture;
-    private static Texture2D _pauseIconLightTexture;
-    private static Texture2D _lockedIconLightTexture;
-    private static Texture2D _unlockedIconDarkTexture;
-    private static Texture2D _unlockedIconLightTexture;
-    private static Texture2D _autoResetOnIconLightTexture;
-    private static Texture2D _autoResetOffIconDarkTexture;
-    private static Texture2D _autoResetOffIconLightTexture;
-
-    private bool _isPlayMode = false;
-    private bool _canResetOnPlayEnd = true;
-    private bool _canSuppressTimeScale = false;
-    private float _chronoScale = 1.0f;
-    private float _originalTimeScale = 1.0f;
-    private float _originalChronoScale = 1.0f;
-    private Rect _windowRect;
-    private ChronoButton[] _chronoButtons;
-    private ChronoButton _currentChronoButton = null;
-
-    [MenuItem("Tools/ChronoHelper")]
-    private static void ShowWindow()
-    {
-        GetWindow<ChronoHelper>();
-    }
-
-    private void Awake()
-    {
-        LoadPrefs();
-        UpdatePlayModeState();
-    }
-
-    private void OnEnable()
-    {
-        EditorApplication.playmodeStateChanged += OnApplicationStateChanged;
-        titleContent = new GUIContent("Chrono Helper");
-        InitTextureContent();
-        CreateChronoButtons();
-    }
-
-    private void OnDisable()
-    {
-        EditorApplication.playmodeStateChanged -= OnApplicationStateChanged;
-        ReleaseTextureContent();
-    }
-
-    private void OnDestroy()
-    {
-        SavePrefs();
-        ResetTimeScale();
-    }
-
-    private void OnInspectorUpdate()
-    {
-        Repaint();
-    }
-
-    private void OnGUI()
-    {
-        UpdateChronoScale();
-        UpdateWindowRect();
-        DrawContextMenu();
-        DrawLayout();
-        UpdateTimeScale();
-    }
-
-    private void InitTextureContent()
-    {
-        _resetIconDarkTexture = CreateTextureFromBase64(kResetIcon_dark, "CH_Icon_Reset_Dark");
-        _pauseIconDarkTexture = CreateTextureFromBase64(kPauseIcon_dark, "CH_Icon_Pause_Dark");
-        _pauseIconLightTexture = CreateTextureFromBase64(kPauseIcon_light, "CH_Icon_Pause_Light");
-        _lockedIconLightTexture = CreateTextureFromBase64(kLockedIcon_light, "CH_Icon_Locked_Light");
-        _unlockedIconDarkTexture = CreateTextureFromBase64(kUnlockedIcon_dark, "CH_Icon_Unlocked_Dark");
-        _unlockedIconLightTexture = CreateTextureFromBase64(kUnlockedIcon_light, "CH_Icon_Unlocked_Light");
-        _autoResetOnIconLightTexture = CreateTextureFromBase64(kAutoResetOnIcon_light, "CH_Icon_AutoResetOn_Light");
-        _autoResetOffIconDarkTexture = CreateTextureFromBase64(kAutoResetOffIcon_dark, "CH_Icon_AutoResetOff_Dark");
-        _autoResetOffIconLightTexture = CreateTextureFromBase64(kAutoResetOffIcon_light, "CH_Icon_AutoResetOff_Light");
-
-        if (EditorGUIUtility.isProSkin)
+        private void ApplyChronoButtonWidth()
         {
-            kResetButtonContent.image = _resetIconDarkTexture;
-            kPauseButtonNormalContent.image = _pauseIconLightTexture;
-            kPauseButtonPressedContent.image = _pauseIconLightTexture;
-            kLockedButtonContent.image = _lockedIconLightTexture;
-            kUnlockedButtonContent.image = _unlockedIconLightTexture;
-            kAutoResetOnButtonContent.image = _autoResetOnIconLightTexture;
-            kAutoResetOffButtonContent.image = _autoResetOffIconLightTexture;
-        }
-        else
-        {
-            kResetButtonContent.image = _resetIconDarkTexture;
-            kPauseButtonNormalContent.image = _pauseIconDarkTexture;
-            kPauseButtonPressedContent.image = _pauseIconLightTexture;
-            kLockedButtonContent.image = _lockedIconLightTexture;
-            kUnlockedButtonContent.image = _unlockedIconDarkTexture;
-            kAutoResetOnButtonContent.image = _autoResetOnIconLightTexture;
-            kAutoResetOffButtonContent.image = _autoResetOffIconDarkTexture;
-        }
-    }
-
-    private void ReleaseTextureContent()
-    {
-        DestroyImmediate(_resetIconDarkTexture);
-        DestroyImmediate(_pauseIconDarkTexture);
-        DestroyImmediate(_lockedIconLightTexture);
-        DestroyImmediate(_unlockedIconDarkTexture);
-        DestroyImmediate(_autoResetOnIconLightTexture);
-        DestroyImmediate(_autoResetOffIconDarkTexture);
-    }
-
-    private void CreateChronoButtons()
-    {
-        _chronoButtons = new ChronoButton[]{
-            new ChronoButton(this, 0.000f, kPauseButtonNormalContent, kPauseButtonPressedContent),
-            new ChronoButton(this, 0.125f, new GUIContent(kOneEighthButtonTitle)),
-            new ChronoButton(this, 0.250f, new GUIContent(kOneFourthButtonTitle)),
-            new ChronoButton(this, 0.500f, new GUIContent(kHalfButtonTitle)),
-            new ChronoButton(this, 1.000f, new GUIContent(kOneButtonTitle)),
-            new ChronoButton(this, 1.500f, new GUIContent(kOneAndHalfButtonTitle)),
-            new ChronoButton(this, 2.000f, new GUIContent(kTwiceButtonTitle))
-        };
-    }
-
-    private void DrawLayout()
-    {
-        float viewWidth = EditorGUIUtility.currentViewWidth;
-        if (viewWidth > kHorizontalLayoutWidth)
-        {
-            DrawHorizontalLayout();
-        }
-        else
-        {
-            DrawVerticalLayout();
-        }
-    }
-
-    private void DrawHorizontalLayout()
-    {
-        minSize = new Vector2(kWindowMinWidth, kHorizontalLayoutHeight);
-        maxSize = new Vector2(kWindowMaxWidth, kHorizontalLayoutHeight);
-
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            DrawControlButtons();
-            DrawChronoSlider();
-        }
-    }
-
-    private void DrawVerticalLayout()
-    {
-        minSize = new Vector2(kWindowMinWidth, kVerticalLayoutHeight);
-        maxSize = new Vector2(kWindowMaxWidth, kVerticalLayoutHeight);
-
-        using (new EditorGUILayout.VerticalScope())
-        {
-            DrawChronoSlider();
-            DrawControlButtons();
-        }
-    }
-
-    private void DrawChronoSlider()
-    {
-        using (new EditorGUILayout.HorizontalScope())
-        {
-            var oldChronoScale = _chronoScale;
-            var content = _isPlayMode ? kPlayModeTooltipContent : kEditModeTooltipContent;
-            _chronoScale = EditorGUILayout.Slider(_chronoScale, 0.0f, 2.0f, kChronoSliderExpandWidth, kChronoSliderMaxWidth);
-            DrawTooltipOverLastRect(content);
-            if (oldChronoScale != _chronoScale)
+            var buttonsWidth = Settings.I.buttonWidth;
+            switch (buttonsWidth)
             {
+                case ButtonWidth.Equal:
+                    _controlButtonWidth = GUILayout.Width(_chronoButtonWidth);
+                    break;
+
+                case ButtonWidth.AsIs:
+                    _controlButtonWidth = GUILayout.MaxWidth(8192.0f);
+                    break;
+            }
+        }
+
+        private void ScheduleChronoButtonsRecreation()
+        {
+            _areChronoButtonDirty = true;
+        }
+
+        private void RecreateChronoButtonsIfRequired()
+        {
+            if (!_areChronoButtonDirty)
+                return;
+
+            ResetChronoButtonWidth();
+
+            var settings = Settings.I;
+            var points = settings.chronoPointList.array;
+            var mode = settings.buttonFormat;
+            int count = points.Length;
+
+            _chronoButtons = new ChronoButton[count];
+            for (int i = 0; i < count; ++i)
+            {
+                var point = points[i];
+                var value = point.value;
+                GUIContent normalContent = null;
+                GUIContent pressedContent = null;
+                if (Mathf.Approximately(value, 0.0f))
+                {
+                    normalContent = kPauseButtonNormalContent;
+                    pressedContent = kPauseButtonPressedContent;
+                }
+                else
+                {
+                    var display = ChronoValueFormatter.Nicify(value, mode);
+                    normalContent = new GUIContent(display);
+                }
+                _chronoButtons[i] = new ChronoButton(this, value, normalContent, pressedContent);
+                UpdateChronoButtonWidth(normalContent);
+            }
+            UpdateChronoButtonWidth(kResetButtonContent);
+            ApplyChronoButtonWidth();
+            _areChronoButtonDirty = false;
+        }
+
+        private void DrawBackground()
+        {
+            _chronoBack.Draw(_windowRect);
+        }
+
+        private void DrawLayout()
+        {
+            float viewWidth = EditorGUIUtility.currentViewWidth;
+            switch (Settings.I.layout)
+            {
+                case Layout.Auto:
+                    if (viewWidth > _chronoButtonsTotalWidth * kHorizontalLayoutThresholdFactor + kHorizontalLayoutThresholdExtra)
+                    {
+                        DrawHorizontalLayout();
+                    }
+                    else
+                    {
+                        DrawVerticalLayout();
+                    }
+                    break;
+
+                case Layout.Vertical:
+                    DrawVerticalLayout();
+                    break;
+
+                case Layout.Horizontal:
+                    DrawHorizontalLayout();
+                    break;
+            }
+        }
+
+        private void DrawHorizontalLayout()
+        {
+            _currentLayout = Layout.Horizontal;
+            minSize = new Vector2(kWindowMinWidth, kHorizontalLayoutHeight);
+            maxSize = new Vector2(kWindowMaxWidth, kHorizontalLayoutHeight);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                switch (Settings.I.blockOrder)
+                {
+                    case BlockOrder.Reversed:
+                        DrawChronoSliderInHorizontalLayout();
+                        DrawControlButtons();
+                        break;
+
+                    case BlockOrder.Normal:
+                    default:
+                        DrawControlButtons();
+                        DrawChronoSliderInHorizontalLayout();
+                        break;
+                }
+            }
+        }
+
+        private void DrawVerticalLayout()
+        {
+            _currentLayout = Layout.Vertical;
+
+            bool isDocked = true;
+#if UNITY_2020_1_OR_NEWER
+            isDocked = docked;
+#endif
+            if (isDocked)
+            {
+                minSize = new Vector2(kWindowMinWidth, kVerticalLayoutDockedHeight);
+                maxSize = new Vector2(kWindowMaxWidth, kVerticalLayoutDockedHeight);
+            }
+            else
+            {
+                minSize = new Vector2(kWindowMinWidth, kVerticalLayoutUndockedHeight);
+                maxSize = new Vector2(kWindowMaxWidth, kVerticalLayoutUndockedHeight);
+            }
+
+            using (new EditorGUILayout.VerticalScope())
+            {
+                switch (Settings.I.blockOrder)
+                {
+                    case BlockOrder.Reversed:
+                        DrawControlButtons();
+                        DrawChronoSlider();
+                        break;
+
+                    case BlockOrder.Normal:
+                    default:
+                        DrawChronoSlider();
+                        GUILayout.Space(-1.0f);
+                        DrawControlButtons();
+                        break;
+                }
+            }
+        }
+
+        private void DrawChronoSliderInHorizontalLayout()
+        {
+            using (new EditorGUILayout.VerticalScope())
+            {
+                GUILayout.Space(5.0f);
+                DrawChronoSlider();
+            }
+        }
+
+        private void DrawChronoSlider()
+        {
+            const float kMinLinearValue = 0.0f;
+            const float kMaxLinearValue = 2.0f;
+            float maxChronoValue = this.maxChronoValue;
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var oldChronoScale = _data.chronoScale;
+                var content = _isPlayMode ? kPlayModeTooltipContent : kEditModeTooltipContent;
+
+                var linear = ChronoScaleToLinear(_data.chronoScale, maxChronoValue);
+                linear = GUILayout.HorizontalSlider(linear, kMinLinearValue, kMaxLinearValue, kChronoSliderExpandWidth, kChronoSliderMaxWidth);
+                _data.chronoScale = ChronoLinearToScale(linear, maxChronoValue);
+
+                float roundChronoScale = (float)Math.Round(_data.chronoScale, 3);
+                _data.chronoScale = EditorGUILayout.FloatField(roundChronoScale, kChronoSliderValueWidth);
+
+                DrawTooltipOverLastRect(content);
+                if (oldChronoScale != _data.chronoScale)
+                {
+                    UpdateChronoButtons();
+                }
+                DrawControlToggles();
+            }
+        }
+
+        private void DrawControlButtons()
+        {
+            var settings = Settings.I;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (settings.blockOrder == BlockOrder.Normal ||
+                    _currentLayout == Layout.Vertical)
+                {
+                    GUILayout.Space(4.0f);
+                }
+                GUILayout.FlexibleSpace();
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (settings.showResetButton)
+                    {
+                        using (new EditorGUI.DisabledScope(!Application.isPlaying))
+                        {
+                            if (GUILayout.Button(kResetButtonContent, kButtonLeftStyle, _controlButtonWidth, kChronoButtonHeight))
+                                ResetTimeScale();
+                        }
+                    }
+
+                    for (int i = 0, count = _chronoButtons.Length; i < count; ++i)
+                    {
+                        string style = kButtonMidStyle;
+                        if (i == 0 && !Settings.I.showResetButton)
+                            style = kButtonLeftStyle;
+                        else if (i == count - 1)
+                            style = kButtonRightStyle;
+
+                        _chronoButtons[i].Draw(style);
+                    }
+                }
+                UpdateChronoButtonsTotalWidth();
                 UpdateChronoButtons();
+
+                GUILayout.FlexibleSpace();
             }
-            DrawControlToggles();
         }
-    }
 
-    private void DrawControlButtons()
-    {
-        using (new EditorGUILayout.HorizontalScope())
+        private void DrawControlToggles()
         {
-            GUILayout.Space(4.0f);
-            GUILayout.FlexibleSpace();
-
-            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button(kResetButtonContent, kControlButtonWidth, kControlButtonHeight))
-                    ResetTimeScale();
-            }
+                {
+                    var autoResetButtonContent = _data.canResetOnPlayEnd
+                                               ? kAutoResetOnButtonContent
+                                               : kAutoResetOffButtonContent;
+                    _data.canResetOnPlayEnd = GUILayout.Toggle(_data.canResetOnPlayEnd, autoResetButtonContent, EditorStyles.miniButtonLeft, kControlToggleOptions);
+                }
 
+                {
+                    var suppressButtonContent = _data.canSuppressTimeScale
+                                              ? kLockedButtonContent
+                                              : kUnlockedButtonContent;
+                    _data.canSuppressTimeScale = GUILayout.Toggle(_data.canSuppressTimeScale, suppressButtonContent, EditorStyles.miniButtonMid, kControlToggleOptions);
+                }
+
+                if (GUILayout.Button(kSettingsButtonContent, EditorStyles.miniButtonRight, kControlToggleOptions))
+                {
+                    OpenSettingsWindow();
+                }
+            }
+        }
+
+        private void DrawContextMenu()
+        {
+            var evt = Event.current;
+            if (evt.type == EventType.ContextClick)
+            {
+                var mousePos = evt.mousePosition;
+                if (_windowRect.Contains(mousePos))
+                {
+                    var menu = new GenericMenu();
+                    PopulateMenu(menu);
+                    menu.ShowAsContext();
+                    evt.Use();
+                }
+            }
+        }
+
+        private void OpenSettingsWindow()
+        {
+            _settingsWindow = SettingsWindow.Open();
+        }
+
+        private void CloseSettingsWindow()
+        {
+            if (_settingsWindow != null)
+                _settingsWindow.Close();
+        }
+
+        private void UpdateChronoButtonsTotalWidth()
+        {
+            float lastWidth = GUILayoutUtility.GetLastRect().width;
+            if (lastWidth > 1.0f)
+                _chronoButtonsTotalWidth = lastWidth;
+        }
+
+        private void UpdateWindowRect()
+        {
+            _windowRect = new Rect(Vector2.zero, position.size);
+        }
+
+        private void CheckChronoScaleIntegrity()
+        {
+            if (_isPlayMode && EditorApplication.isPlaying)
+            {
+                var settings = Settings.I;
+                var warningMode = settings.warningMode;
+                bool isIntegrityViolated = (_data.chronoScale != Time.timeScale);
+                bool showWarning = false;
+                switch (warningMode)
+                {
+                    case WarningMode.WhenNotSuppressing:
+                        if (!_data.canSuppressTimeScale)
+                            showWarning = true;
+                        break;
+
+                    case WarningMode.Always:
+                        showWarning = true;
+                        break;
+                }
+                if (showWarning && isIntegrityViolated)
+                {
+                    _chronoBack.mode = ChronoBack.Mode.Warning;
+                }
+            }
+        }
+
+        private void UpdateChronoScale()
+        {
+            if (_isPlayMode &&
+                !_data.canSuppressTimeScale &&
+                EditorApplication.isPlaying)
+            {
+                _data.chronoScale = Time.timeScale;
+            }
+        }
+
+        private void UpdateTimeScale()
+        {
+            if (_isPlayMode)
+                Time.timeScale = _data.chronoScale;
+        }
+
+        private void UpdateChronoButtons()
+        {
             for (int i = 0; i < _chronoButtons.Length; ++i)
             {
-                GUILayout.Space(-2.0f);
-                _chronoButtons[i].Draw();
+                _chronoButtons[i].Update();
             }
-            UpdateChronoButtons();
-
-            GUILayout.FlexibleSpace();
         }
-    }
 
-    private void DrawControlToggles()
-    {
-        using (new EditorGUILayout.HorizontalScope())
+        private void StoreTimeScale()
         {
-            var options = new GUILayoutOption[] { kControlToggleWidth, kControlToggleHeight, kControlToggleExpandWidth };
-
-            var autoResetButtonContent = _canResetOnPlayEnd
-                                       ? kAutoResetOnButtonContent
-                                       : kAutoResetOffButtonContent;
-            _canResetOnPlayEnd = GUILayout.Toggle(_canResetOnPlayEnd, autoResetButtonContent, EditorStyles.miniButtonLeft, options);
-
-            var suppressButtonContent = _canSuppressTimeScale
-                                      ? kLockedButtonContent
-                                      : kUnlockedButtonContent;
-            _canSuppressTimeScale = GUILayout.Toggle(_canSuppressTimeScale, suppressButtonContent, EditorStyles.miniButtonRight, options);
+            _originalTimeScale = Time.timeScale;
+            _originalChronoScale = _data.chronoScale;
         }
-    }
 
-    private void DrawContextMenu()
-    {
-        Event evt = Event.current;
-        if (evt.type == EventType.ContextClick)
+        private void ResetTimeScale()
         {
-            Vector2 mousePos = evt.mousePosition;
-            if (_windowRect.Contains(mousePos))
+            Time.timeScale = _originalTimeScale;
+            if (_data.canResetOnPlayEnd)
             {
-                var menu = new GenericMenu();
-                menu.AddItem(kGithubMenuItemContent, false, () => OpenURL(kGithubUrl));
-                //menu.AddItem(kAssetStoreMenuItemContent, false, () => OpenURL(kAssetStoreUrl));
-                menu.ShowAsContext();
-
-                evt.Use();
+                _data.chronoScale = _originalChronoScale;
             }
         }
-    }
 
-    private void DrawTooltipOverLastRect(GUIContent content)
-    {
-        var lastRect = GUILayoutUtility.GetLastRect();
-        GUI.Label(lastRect, content);
-    }
-
-    private void UpdateWindowRect()
-    {
-        _windowRect = new Rect(Vector2.zero, position.size);
-    }
-
-    private void UpdateChronoScale()
-    {
-        if (_isPlayMode &&
-            !_canSuppressTimeScale &&
-            EditorApplication.isPlaying)
+        private void UpdatePlayModeState()
         {
-            _chronoScale = Time.timeScale;
+            var oldPlayMode = _isPlayMode;
+            _isPlayMode = EditorApplication.isPlaying;
+            if (_isPlayMode && !oldPlayMode) // EditMode -> PlayMode
+            {
+                StoreTimeScale();
+                UpdateTimeScale();
+            }
+            else if (!_isPlayMode && oldPlayMode) // PlayMode -> EditMode
+            {
+                ResetTimeScale();
+            }
         }
-    }
 
-    private void UpdateTimeScale()
-    {
-        if (_isPlayMode)
-            Time.timeScale = _chronoScale;
-    }
-
-    private void UpdateChronoButtons()
-    {
-        for (int i = 0; i < _chronoButtons.Length; ++i)
+        private void PopulateMenu(GenericMenu menu)
         {
-            _chronoButtons[i].Update();
+            menu.AddItem(kSettingsMenuItemContent, false, OpenSettingsWindow);
+            menu.AddItem(kGitHubMenuItemContent, false, () => Application.OpenURL(Consts.URL.Github));
+            menu.AddItem(kHomepageMenuItemContent, false, () => Application.OpenURL(Consts.URL.Homepage));
+            menu.AddItem(kDotsquidDotComMenuItemContent, false, () => Application.OpenURL(Consts.URL.DotsquidDotCom));
         }
-    }
 
-    private void StoreTimeScale()
-    {
-        _originalTimeScale = Time.timeScale;
-        _originalChronoScale = _chronoScale;
-    }
-
-    private void ResetTimeScale()
-    {
-        Time.timeScale = _originalTimeScale;
-        if (_canResetOnPlayEnd)
+        void IHasCustomMenu.AddItemsToMenu(GenericMenu menu)
         {
-            _chronoScale = _originalChronoScale;
+            PopulateMenu(menu);
         }
-    }
 
-    private void OnApplicationStateChanged()
-    {
-        UpdatePlayModeState();
-    }
-
-    private void UpdatePlayModeState()
-    {
-        var oldPlayMode = _isPlayMode;
-        _isPlayMode = EditorApplication.isPlaying;
-        if (_isPlayMode && !oldPlayMode) // EditMode -> PlayMode
+        private void OnApplicationStateChanged(PlayModeStateChange state)
         {
-            StoreTimeScale();
-            UpdateTimeScale();
+            switch (state)
+            {
+                case PlayModeStateChange.ExitingEditMode:
+                    _isPlayMode = true;
+                    StoreTimeScale();
+                    UpdateTimeScale();
+                    break;
+
+                case PlayModeStateChange.EnteredEditMode:
+                    _isPlayMode = false;
+                    ResetTimeScale();
+                    break;
+            }
         }
-        else if (!_isPlayMode && oldPlayMode) // PlayMode -> EditMode
+
+        private void OnChronoButtonsDirty()
         {
-            ResetTimeScale();
+            ScheduleChronoButtonsRecreation();
         }
-    }
 
-    private void LoadPrefs()
-    {
-        _chronoScale = EditorPrefs.GetFloat(kChronoScalePrefKey, kChronoScalePrefDefault);
-        _canResetOnPlayEnd = EditorPrefs.GetBool(kCanResetChronoScalePrefKey, kCanResetChronoScalePrefDefault);
-        _canSuppressTimeScale = EditorPrefs.GetBool(kCanSuppressTimeScalePrefKey, kCanSuppressTimeScalePrefDefault);
-    }
-
-    private void SavePrefs()
-    {
-        EditorPrefs.SetFloat(kChronoScalePrefKey, _chronoScale);
-        EditorPrefs.SetBool(kCanResetChronoScalePrefKey, _canResetOnPlayEnd);
-        EditorPrefs.SetBool(kCanSuppressTimeScalePrefKey, _canSuppressTimeScale);
-    }
-
-    private static void OpenURL(string url)
-    {
-        Application.OpenURL(url);
-    }
-
-    private static Texture2D CreateTextureFromBase64(string base64, string name = "")
-    {
-        byte[] data = Convert.FromBase64String(base64);
-        var tex = new Texture2D(1, 1, TextureFormat.ARGB32, false, true)
+        private void OnChronoWarningTest()
         {
-            hideFlags = HideFlags.HideAndDontSave,
-            name = name,
-            filterMode = FilterMode.Bilinear
-        };
-        tex.LoadImage(data);
-        return tex;
+            _chronoBack.mode = ChronoBack.Mode.Warning;
+        }
+
+        private void Subscribe()
+        {
+            SettingsWindow.onChronoButtonsDirty += OnChronoButtonsDirty;
+            SettingsWindow.onChronoWarningTest += OnChronoWarningTest;
+            EditorApplication.playModeStateChanged += OnApplicationStateChanged;
+        }
+
+        private void Unsubscribe()
+        {
+            SettingsWindow.onChronoButtonsDirty -= OnChronoButtonsDirty;
+            SettingsWindow.onChronoWarningTest -= OnChronoWarningTest;
+            EditorApplication.playModeStateChanged -= OnApplicationStateChanged;
+        }
+
+        private static void DrawTooltipOverLastRect(GUIContent content)
+        {
+            var lastRect = GUILayoutUtility.GetLastRect();
+            GUI.Label(lastRect, content);
+        }
+
+        private static float ChronoScaleToLinear(float scale, float max)
+        {
+            if (scale <= 1.0f)
+                return scale;
+            else
+                return Mathf.InverseLerp(1.0f, max, scale) + 1.0f;
+        }
+
+        private static float ChronoLinearToScale(float linear, float max)
+        {
+            if (linear <= 1.0f)
+                return linear;
+            else
+                return Mathf.Lerp(1.0f, max, linear - 1.0f);
+        }
     }
 }

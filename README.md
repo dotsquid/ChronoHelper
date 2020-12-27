@@ -1,26 +1,31 @@
 # ChronoHelper
 ChronoHelper is a free open-source tool for Unity Editor for controlling TimeScale in PlayMode with ease.
 It becomes very handy when it’s required to examine a suspicious moment of gameplay in slow-motion or conversely when it’s preferable to skip uninteresting part in fast-forward.  
-[![Say Thanks!](https://img.shields.io/badge/Say%20Thanks-!-1EAEDB.svg)](https://saythanks.io/to/dotsquid)
-
-## Installation
-Just drop *'ChronoHelper'* folder to your project's *'Asset'* folder.  
-However it's better to keep everything in order. That's why *'YourProject/Assets/3rdParty/ChronoHelper'* is more recommended.
 
 ## Usage
-Use ‘Tools/Chrono Helper’ menu to open ChronoHelper.  
+Use ‘Window/ChronoHelper’ menu to open ChronoHelper.  
 To change current timeScale use the slider or shortcut buttons.  
 While being in EditorMode, ChronoHelper is inactive. That is done to protect the user from accidental changing of Time.timeScale project setting.  
-![Usage](https://i.imgur.com/NqPbxkN.gif)  
-Right after switching to PlayMode ChronoHelper captures the default value of Time.timeScale in order to restore this value on switching back to EditorMode (if ‘Auto-reset’ is on).  
-![Auto-reset](https://i.imgur.com/mldW9zE.gif)  
-Use ‘Lock’ if you want to suppress any changes of Time.timeScale from without (like other scripts or TimeManager Inspector). Be aware that this mode can break the normal flow of your game (e.g. the game won’t actually pause in main menu).  
-![Lock Off](https://i.imgur.com/rfJnloe.gif)  
-![Lock On](https://i.imgur.com/xFNxR7f.gif) 
+![Usage](https://i.imgur.com/wyETLir.gif)  
 
-> ### Tip
-> ChronoHelper's window was designed to occupy as less screen space as possible. The suggested way to place the window is to dock it above or below the GameView window. In this case the slider and shortcut buttons are arranged in horizontal layout  
-> ![Horizontal layout](https://i.imgur.com/XqNoHPK.gif)
->  
-> If the window is not wide enough vertical layout is used  
-> ![Vertical layout](https://i.imgur.com/5KVVUAO.gif)
+You can add, remove and modify shortcut buttons in settings.  
+![Settings](https://i.imgur.com/mdjLvcw.gif)  
+
+## Installation
+### Package Manager (preferred)
+To add ChronoHelper as a package:  
+1) go to *Window/Package Manager*;
+2) press '➕▾' button (in the top left corner of the window);
+3) select 'Add package from git URL';
+4) insert URL of this repository *https://github.com/dotsquid/ChronoHelper.git*.
+
+### Git submodule
+Open your favourite command-line interface, switch to your project's directory and use the following command  
+`git submodule add https://github.com/dotsquid/ChronoHelper`
+Or check the documentation of your preferred Git-client.
+
+### Old way (not recommended)
+Download *ChronoHelper* as a ZIP-archive and unpack it to your project's *'Asset'* folder.  
+
+## Documentation
+You may find more information [in the manual](Documentation~/ChronoHelper-Manual.pdf)
