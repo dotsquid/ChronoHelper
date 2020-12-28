@@ -8,7 +8,7 @@ To change current timeScale use the slider or shortcut buttons.
 While being in EditorMode, ChronoHelper is inactive. That is done to protect the user from accidental changing of Time.timeScale project setting.  
 ![Usage](https://i.imgur.com/wyETLir.gif)  
 
-You can add, remove and modify shortcut buttons in settings.  
+You can add, remove and modify shortcut buttons as well as change other preferences in the Settings window.  
 ![Settings](https://i.imgur.com/mdjLvcw.gif)  
 
 ## Installation
@@ -22,7 +22,7 @@ To add ChronoHelper as a package:
 ### Git submodule
 Open your favourite command-line interface, switch to your project's directory and use the following command  
 `git submodule add https://github.com/dotsquid/ChronoHelper`
-Or check the documentation of your preferred Git-client.
+Or follow the documentation of your preferred Git-client.
 
 ### Old way (not recommended)
 Download *ChronoHelper* as a ZIP-archive and unpack it to your project's *'Asset'* folder.  
