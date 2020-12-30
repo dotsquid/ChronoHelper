@@ -24,6 +24,9 @@ Open your favourite command-line interface, switch to your project's directory a
 `git submodule add https://github.com/dotsquid/ChronoHelper`
 Or follow the documentation of your preferred Git-client.
 
+### AssetStore
+Download and install from *https://assetstore.unity.com/packages/tools/utilities/chronohelper-116665*
+
 ### Old way (not recommended)
 Download *ChronoHelper* as a ZIP-archive and unpack it to your project's *'Asset'* folder.  
 
